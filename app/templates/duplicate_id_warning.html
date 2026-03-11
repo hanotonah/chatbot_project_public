@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duplicate Student ID - Warning</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background: var(--primary-light-grey);
+        }
+        
+        .warning-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .warning-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .warning-title {
+            color: #dc3545;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .warning-message {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .warning-message strong {
+            display: block;
+            margin: 10px 0;
+            color: #000;
+        }
+        
+        .warning-message .participant-code {
+            font-family: monospace;
+            background: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .warning-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .warning-actions form {
+            flex: 1;
+        }
+        
+        .warning-btn {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+        }
+        
+        .btn-go-back {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-go-back:hover {
+            background: #5a6268;
+        }
+        
+        .btn-continue {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-continue:hover {
+            background: #c82333;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="warning-container">
+        <div class="warning-icon">⚠️</div>
+        
+        <div class="warning-title">Duplicate Student ID</div>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <div class="warning-message">
+            <p>A conversation log for this ID already exists:</p>
+            <p class="participant-code">{{ participant_code }}</p>
+            <p><strong>Please ask the researcher whether you can continue.</strong></p>
+        </div>
+        
+        <div class="warning-actions">
+            <form method="POST">
+                <button type="submit" name="action" value="go_back" class="warning-btn btn-go-back">
+                    Go back to login
+                </button>
+            </form>
+            <form method="POST">
+                <button type="submit" name="action" value="continue" class="warning-btn btn-continue">
+                    Continue (delete old log)
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

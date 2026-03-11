@@ -1,0 +1,93 @@
+<!-- 
+Main chat interface
+
+This page displays the chat interface where users can interact with the chatbot.
+Basic structure includes:
+- Header with chat title and user info
+- Chat messages area
+- Input area for user messages
+- End conversation button
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <button id="endConversationButton" class="end-conversation-button in-header">
+                End Conversation
+            </button>
+            <div class="header-content">
+                <h1>Creative Technology Virtual Assistant</h1>
+                <div class="header-info">
+                    {% if participant_code %}
+                    <p class="participant-id">Participant: {{ participant_code }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- VA Name Subheader -->
+        <div class="va-subheader">
+            <h2 class="va-name">{{ currentBotName }}</h2>
+        </div>
+        
+        <!-- Chat messages area -->
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will be added here dynamically by JavaScript -->
+            <div class="loading-indicator" id="loadingIndicator">
+                Initializing chat...
+            </div>
+        </div>
+        
+        <!-- Input area -->
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <textarea 
+                    id="userInput" 
+                    class="chat-input" 
+                    placeholder="Type your message here..."
+                    rows="1"
+                    disabled
+                ></textarea>
+                <button id="sendButton" class="send-button" disabled>
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation for ending conversation -->
+    <div id="endModal" class="modal">
+        <div class="modal-content">
+            <h2>End Conversation?</h2>
+            <p><strong>⚠️ Important:</strong> Once you end this conversation, it cannot be resumed. Your chat history will be saved, but you will not be able to return to this conversation.</p>
+            <div class="modal-buttons">
+                <button id="confirmEndButton" class="modal-button confirm">Yes, End Conversation</button>
+                <button id="cancelEndButton" class="modal-button cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Warning modal for navigation/leaving page -->
+    <div id="leaveWarningModal" class="modal">
+        <div class="modal-content">
+            <h2>Leave Conversation?</h2>
+            <p><strong>⚠️ Important:</strong> If you leave now, this conversation will be saved and ended. You cannot return to it.</p>
+            <div class="modal-buttons">
+                <button id="confirmLeaveButton" class="modal-button confirm">Yes, leave and end conversation</button>
+                <button id="cancelLeaveButton" class="modal-button cancel">No, stay</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load JavaScript -->
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>

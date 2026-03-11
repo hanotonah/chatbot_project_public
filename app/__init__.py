@@ -1,0 +1,3 @@
+"""
+Application entry points package.
+"""

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Virtual Assistant D4E Course</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* 
+        Login page styles
+
+        STRUCTURE:
+        - Centered login card
+        - Header with title and subtitle
+        - Form with username and password fields
+        - Error message display
+        - Login button
+        - Info box for study participants
+
+        */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--login-background);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: var(--login-card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            color: var(--primary-blue);
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+        
+        .login-header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 18px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: var(--danger-color);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .login-button:hover {
+            background-color: var(--primary-hover-blue);
+        }
+        
+        .login-button:active {
+            transform: translateY(1px);
+        }
+        
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #d4e4f7;
+            border-left: 4px solid #0742b3;
+            border-radius: 4px;
+            font-size: 16px;
+            color: #053380;
+        }
+        
+        .login-logo {
+            width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <img src="{{ url_for('static', filename='images/CreaTe_logo.png') }}" alt="Logo" class="login-logo">
+            <h3>Creative Technology</h3>
+            <h1>Virtual Assistant</h1>
+        </div>
+        
+        <!-- Show error message if login failed -->
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label for="participant_code">Student ID</label>
+                <input 
+                    type="text" 
+                    id="participant_code" 
+                    name="participant_code" 
+                    required 
+                    autofocus
+                    placeholder="Enter your student ID"
+                >
+            </div>
+            
+            <button type="submit" class="login-button">
+                Start
+            </button>
+        </form>
+
+    </div>
+</body>
+</html>

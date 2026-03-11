@@ -1,0 +1,300 @@
+<!-- 
+Initialization Page
+
+This page is displayed while the chatbot platform is being set up.
+After successful initialization, the user can proceed to the chat interface.
+If initialization fails, an error message is shown with a retry option.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initializing</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .init-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-hover-blue) 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        .init-content {
+            background: white;
+            padding: 60px 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .init-content h1 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 28px;
+        }
+
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-blue);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-text {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .ready-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .ready-state.show {
+            display: flex;
+        }
+
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .ready-text {
+            color: #4CAF50;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .start-button {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 14px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .start-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px var(--primary-hover);
+        }
+
+        .start-button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .start-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .error-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .error-state.show {
+            display: flex;
+        }
+
+        .error-icon {
+            width: 80px;
+            height: 80px;
+            background: #f44336;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+        }
+
+        .error-text {
+            color: #f44336;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .retry-button {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .retry-button:hover {
+            background: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="init-container">
+        <div class="init-content">
+            <h1>Welcome</h1>
+            
+            <!-- Loading State -->
+            <div class="loading-state" id="loadingState">
+                <div class="spinner"></div>
+                <div class="status-text">Setting up Creative Technology Virtual Assistant platform...</div>
+                <div class="status-text">Please wait a moment</div>
+            </div>
+
+            <!-- Ready State -->
+            <div class="ready-state" id="readyState">
+                <div class="checkmark">✓</div>
+                <div class="ready-text">All set!</div>
+                <div class="status-text">Creative Technology Virtual Assistant is ready to help.</div>
+                <button class="start-button" id="startButton">Start conversation</button>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state" id="errorState">
+                <div class="error-icon">✕</div>
+                <div class="error-text" id="errorMessage">Something went wrong. Please try again.</div>
+                <button class="retry-button" id="retryButton">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Initialize the application on page load
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApplication();
+        });
+
+        /**
+         * Initialize the application by calling the backend initialization endpoint
+         */
+        async function initializeApplication() {
+            try {
+                const response = await fetch('/api/init_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Initialization failed with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show ready state after a short delay for better UX
+                    setTimeout(showReadyState, 500);
+                } else {
+                    showErrorState(data.message || 'Initialization failed');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showErrorState('Failed to initialize chatbot. Please check your connection.');
+            }
+        }
+
+        /**
+         * Show the ready state UI
+         */
+        function showReadyState() {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').classList.remove('show');
+            document.getElementById('readyState').classList.add('show');
+
+            // Setup start button
+            document.getElementById('startButton').addEventListener('click', startConversation);
+        }
+
+        /**
+         * Show the error state UI
+         */
+        function showErrorState(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('readyState').classList.remove('show');
+            document.getElementById('errorState').classList.add('show');
+            document.getElementById('errorMessage').textContent = message;
+
+            // Setup retry button
+            document.getElementById('retryButton').addEventListener('click', function() {
+                location.reload();
+            });
+        }
+
+        /**
+         * Redirect to chat page
+         */
+        function startConversation() {
+            window.location.href = '/chat';
+        }
+        
+        // Clean up session when user leaves the init page without starting chat
+        let chatStarted = false;
+        
+        window.addEventListener('pagehide', function(e) {
+            // Only clean up if user hasn't started the chat
+            if (!chatStarted) {
+                navigator.sendBeacon('/api/cleanup_session_on_exit');
+            }
+        });
+        
+        // Mark chat as started when user clicks start button
+        const originalStartConversation = startConversation;
+        startConversation = function() {
+            chatStarted = true;
+            originalStartConversation();
+        };
+    </script>
+</body>
+</html>
