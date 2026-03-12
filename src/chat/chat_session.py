@@ -90,6 +90,7 @@ class ChatSessionManager:
             'start_time': datetime.now(),
             'models_used': models_used or {},
             'condition_key': condition_key,  # Store condition info
+            'handover_event_turn': None,  # The turn at which a handover keyword was first detected; None until that moment
             'messages': []  # Store all messages for this session
         }
 

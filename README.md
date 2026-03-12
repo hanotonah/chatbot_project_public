@@ -25,7 +25,7 @@ This platform enables conversations with specialized VAs, each with distinct rol
 
 #### Conversation flow - single or multiple VAs
 
-The system supports interaction with a single VA, as well as a VA handing over the conversation to another VA based on keyword detection. Each VA has access to its own vector database containing relevant knowledge. 
+The system supports interaction with a single VA, as well as a VA handing over the conversation to another VA. Each VA has access to its own vector database containing relevant knowledge.
 
 Which VAs are initialized at the start of the conversation depends on which VAs have been included in the current condition, defined in [config/conditions.py](config/conditions.py).
 
@@ -36,11 +36,30 @@ Which VAs are initialized at the start of the conversation depends on which VAs 
 
 **In case the current condition includes multiple VAs**, a handover can also be triggered:
 
-4. If at least a certain amount of turns has passed and the (expanded) query contains one of the predetermined keywords (see [src/chat/query_router.py](src/chat/query_router.py)), the current VA does not answer the query, but triggers a handover
+4. If at least a certain amount of turns has passed and a routing rule matches the user's message (see [src/chat/query_router.py](src/chat/query_router.py)), the current VA does not answer the query, but triggers a handover
 5. Current conversation history and user query are saved
-6. The current VA notifies the user that the conversation will be handed over to another VA (see [src/app/flask_app.py](src/app/flask_app.py))
+6. The current VA notifies the user that the conversation will be handed over to another VA (see [app/flask_app.py](app/flask_app.py))
 7. The chat switches to the new VA, which responds to the previous user query using conversation history
 8. The conversation continues with the new VA
+
+#### Routing
+
+The query router ([src/chat/query_router.py](src/chat/query_router.py)) decides when a handover should occur. It works through a list of routing rules, where each rule specifies:
+- Which VA must be currently active (`from_bot`)
+- Which VA to hand over to (`to_bot`)
+- Which detection method to use (`method`)
+
+The detection method determines *how* the router decides whether a rule matches. Currently
+the only method is `keyword` (regex-based keyword matching), but the router is designed
+so that new methods can be added by implementing a handler in `_check_rule_match()` and
+creating rules that reference the new method name. See the docstring in
+[src/chat/query_router.py](src/chat/query_router.py) for step-by-step instructions.
+
+#### Session ending
+
+After a routing keyword is detected (regardless of whether an actual handover took place) and a configurable number of additional turns have passed, the system shows a series of ending messages and a link to a planning template page. The planning page ([app/templates/planning.html](app/templates/planning.html)) displays a thank-you message and plays a short audio chime to alert researchers that the participant has reached the end of the session.
+
+When the participant clicks the planning link, a notification sound is played on the researcher's machine (server-side, via `winsound`). The ending messages are defined directly in [app/flask_app.py](app/flask_app.py). The turn thresholds that control when handover and ending are triggered can be found in [config/tunables.py](config/tunables.py).
 
 
 ## Setup instructions
@@ -95,7 +114,8 @@ Specify which Ollama models to use by changing the `CURRENT_*` variables. Any mo
 Adjust system behavior:
 - `CHUNKS_INCLUDED_IN_CONTEXT`: Number of relevant chunks to retrieve
 - `RELEVANCE_THRESHOLD`: Similarity cutoff for retrieval. Lower scores mean higher relevance
-- `MIN_TURNS_BEFORE_HANDOVER`: Minimum conversation turns before handover can take place. Ensures that the user has had at least some interaction with each VA.
+- `MIN_TURNS_BEFORE_HANDOVER`: Minimum conversation turns before handover can take place. Ensures that the user has had at least some interaction with each VA
+- `MIN_TURNS_AFTER_HANDOVER_FOR_ENDING`: Minimum turns after the handover event before the session ending messages are shown. Ensures that the user has had at least some interaction with a VA after handover
 - `ENABLE_RESPONSE_SUMMARIZATION`: Enable/disable automatic response summarization (default: disabled)
 - `RESPONSE_SENTENCE_LIMIT`: Sentence threshold used if summarization is enabled
 - `MAX_CHARS` / `MIN_CHARS`: Target chunk sizes for database creation
@@ -158,7 +178,7 @@ If you want to add a new database type, update the following:
 - `DB_CONFIG` in [create_database.py](data_sources/create_database.py)
 - Path config in [config/paths.py](config/paths.py)
 
-4. Run the [run_database_creaation.py](run_database_creation.py) file and follow the instructions in the terminal
+4. Run the [run_database_creation.py](run_database_creation.py) file and follow the instructions in the terminal
 
 ### Requirements
 

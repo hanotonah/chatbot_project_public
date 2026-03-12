@@ -1,0 +1,30 @@
+# System files
+__pycache__/
+*/__pycache__/
+.venv/
+.vscode/
+README_internal.md
+
+# Runtime storage (logs, sessions, participant data)
+# These directories exist but their contents are gitignored
+storage/conversation_logs/*
+!storage/conversation_logs/.gitkeep
+storage/flask_session/*
+!storage/flask_session/.gitkeep
+storage/participants/participant_registry.json
+
+# Data sources - NOT included in repository due to sensitity of data
+# Knowledge base markdown files and vector databases must be provided separately
+# See README.md section "Required Data Files" for setup instructions
+data_sources/Data/Context/*
+!data_sources/Data/Context/.gitkeep
+data_sources/Data/Unused_context/*
+!data_sources/Data/Unused_context/.gitkeep
+data_sources/Database/*
+!data_sources/Database/.gitkeep
+
+# Keep the database creation script and folders
+!data_sources/create_database.py
+!data_sources/__init__.py
+!data_sources/Data/
+!data_sources/Data/.gitkeep

@@ -3,7 +3,6 @@ Runtime wiring for models and middleware.
 Edit the model selections below to customize which LLMS to use.
 """
 
-from langchain.agents.middleware import SummarizationMiddleware
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 
 # ============================================================================
@@ -33,6 +32,7 @@ def build_default_middleware() -> list:
     return []
 
     # If you want to add Langchain's SummarizationMiddleware to automatically summarize long conversation history, here is an example:
+    # from langchain.agents.middleware import SummarizationMiddleware
     # return [
     #     # Summarize the conversation history when it exceeds a certain amount of tokens while keeping most recent messages
     #     SummarizationMiddleware(

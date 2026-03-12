@@ -121,7 +121,7 @@ def main():
     current_bot_type = ChatbotType.TEACHER
 
     admin_mode = False  # Toggle for showing diagnostic information
-    turn_count = 0      # Track how many turns have passed (to prevent early hanfdover)
+    turn_count = 0      # Track how many turns have passed (to prevent early handover)
 
     # After initialization, suppress INFO logs to reduce console clutter during conversation
     # Re-enable logging by toggling admin mode

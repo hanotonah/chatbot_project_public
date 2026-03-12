@@ -46,7 +46,7 @@ class ChatbotRegistry:
                 "initializer": StudyAdviser.initialize_adviser,
                 "name": "Jaimie",
                 "role": "study adviser",
-                "display_name": "{name} (Study Adviser)",
+                "display_name": "{name} (Study adviser)",
                 "greeting": "Hello! I'm {name}, the virtual study adviser for Creative Technology. How can I assist you today?"
             },
             ChatbotType.GENERAL: {

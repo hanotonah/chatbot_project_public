@@ -24,6 +24,7 @@ from pathlib import Path
 import secrets
 from time import time
 from typing import Optional
+import winsound
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_session import Session
@@ -39,6 +40,7 @@ from config.tunables import (
     CHUNKS_INCLUDED_IN_CONTEXT,
     ENABLE_RESPONSE_SUMMARIZATION,
     MIN_TURNS_BEFORE_HANDOVER,
+    MIN_TURNS_AFTER_HANDOVER_FOR_ENDING,
     RELEVANCE_THRESHOLD,
     RESPONSE_SENTENCE_LIMIT,
 )
@@ -140,6 +142,11 @@ def get_model_identifier(model_obj):
 # - Greeting messages for starting conversations
 
 registry = ChatbotRegistry()
+
+# A keyword detector is kept ready at all times so that handover keywords can be
+# recognised in every study condition — including the single-chatbot condition where
+# the router is disabled and no actual handover takes place.
+_keyword_detector = QueryRouter()
 
 
 # ============================================================================
@@ -505,11 +512,15 @@ def api_message():
     The function handles these steps:
     1. Gets the user's message from the web page
     2. Expands any abbreviations (e.g., "CT" becomes "Creative Technology")
-    3. Checks if the message should trigger a handover
-    4. Gets the chatbot's response
-    5. Checks if the response is too long and summarizes it if needed
-    6. Logs the message and response to the conversation history
-    7. Returns the response back to the web page for display
+    3. Records whether a handover keyword was mentioned for the first time
+       (needed to determine when the session's ending phase should begin)
+    4. Checks if the message should trigger a handover
+    5. Checks if enough turns have passed since the handover event to trigger
+       the session ending (if so, the ending messages replace the bot response)
+    6. Gets the chatbot's response
+    7. Checks if the response is too long and summarizes it if needed
+    8. Logs the message and response to the conversation history
+    9. Returns the response back to the web page for display
     """
     if not session.get('authenticated'):
         return jsonify({'error': 'Not authenticated'}), 401
@@ -537,6 +548,22 @@ def api_message():
     # Convert abbreviations to full words
     expanded_query = expand_abbreviations(user_query)
     
+    # --- Record the first time a handover keyword is mentioned ---
+    # This starts the ending countdown regardless of whether an actual handover
+    # takes place (in the single-chatbot condition there is no handover, but the
+    # same keywords still signal the relevant moment in the conversation).
+    # The check is skipped for handover follow-ups because the original keyword
+    # message has already been recorded.
+    if (not is_handover_followup
+            and chat_session.get('handover_event_turn') is None
+            and turn_count >= MIN_TURNS_BEFORE_HANDOVER
+            and _keyword_detector.get_triggered_keyword(expanded_query.lower())):
+        chat_session['handover_event_turn'] = turn_count
+        logger.info(
+            f"Handover keyword detected at turn {turn_count}. "
+            f"Ending will trigger after {MIN_TURNS_AFTER_HANDOVER_FOR_ENDING} more turns."
+        )
+
     # Check if this message should hand over to a different chatbot
     if not is_handover_followup:
         handover_needed, target_bot_type, triggered_keyword = check_handover_needed(
@@ -550,6 +577,80 @@ def api_message():
                 expanded_query, triggered_keyword, user_query
             )
     
+    # --- Check whether the session ending phase should begin ---
+    # Like handover, this intercepts the user's message before the chatbot
+    # processes it. The ending is triggered after a handover keyword was
+    # detected AND enough additional turns have passed (both thresholds are
+    # set in config/tunables.py).
+    handover_event_turn = chat_session.get('handover_event_turn')
+
+    if (not is_handover_followup
+            and handover_event_turn is not None
+            and turn_count - handover_event_turn >= MIN_TURNS_AFTER_HANDOVER_FOR_ENDING):
+
+        # ---- Edit the ending messages here ----
+        # These messages are shown to the student once the conversation phase
+        # is complete. 'text' messages appear as normal chat bubbles; the
+        # 'link' message shows a clickable link to the planning template page.
+        ending_messages = [
+            {
+                'type': 'text',
+                'text': "Some students who struggle with time management find it useful to discuss their planning with other students. We run a small study help group where students bring and discuss a weekly plan that everyone prepares beforehand."
+            },
+            {
+                'type': 'text',
+                'text': "For now, I would suggest that you try creating a weekly plan, and to join the study help group if you think it could be useful for you."
+            },
+            {
+                'type': 'link',
+                'text': "You can find a template weekly planning here: ",
+                'link_url': '/planning',
+                'link_text': "Template weekly planning"
+            }
+        ]
+        # ---- End of ending messages ----
+
+        logger.info(
+            f"Session ending triggered at turn {turn_count} "
+            f"({turn_count - handover_event_turn} turns after handover event at turn {handover_event_turn})."
+        )
+
+        # Keep session turn_count aligned with the logged turn
+        session_manager.update_session(
+            session_id=session_id,
+            current_bot=current_bot,
+            current_bot_type=current_bot_type,
+            turn_count=turn_count + 1
+        )
+
+        # Store ending messages in the log as one combined assistant response
+        ending_message_text = "\n\n".join(
+            (msg['text'] + msg['link_text'] + " (" + msg['link_url'] + ")")
+            if msg.get('type') == 'link'
+            else msg['text']
+            for msg in ending_messages
+        )
+
+        conversation_logger.log_message(
+            session_id=session_id,
+            speaker=current_bot.name,
+            ai_response=ending_message_text,
+            user_query=user_query,
+            expanded_query=expanded_query,
+            timestamp=datetime.now(),
+            handover_info={'session_ending': True},
+            chunks=None,
+            processing_time=None,
+            summarization_info=None
+        )
+
+        return jsonify({
+            'bot_name': current_bot.name,
+            'bot_display_name': registry.get_bot_display_name(current_bot_type),
+            'session_ending': True,
+            'ending_messages': ending_messages
+        })
+
     # If we're in the middle of a handover, get the new bot and context
     handover_context = None
     if chat_session.get('pending_handover'):
@@ -640,7 +741,7 @@ def api_message():
         current_bot_type=current_bot_type,
         turn_count=turn_count + 1
     )
-    
+
     # Prepare the response to send back to the web page
     response_data = {
         'bot_name': current_bot.name,
@@ -664,6 +765,17 @@ def api_end_conversation():
     session_id = session.get('session_id')
     
     if session_id:
+        # If the chat session was already ended earlier, treat this as a valid
+        # no-op. This avoids duplicate-end warnings when the user clicks
+        # "End Conversation" after an automatic end.
+        if not session_manager.has_session(session_id):
+            logger.info(f"Conversation already ended for session {session_id}")
+            return jsonify({
+                'message': 'Conversation was already ended',
+                'log_file': None,
+                'redirect': '/conversation_ended'
+            })
+
         # Save the conversation
         log_file = session_manager.end_session(session_id, conversation_logger)
         logger.info(f"Conversation ended and saved to {log_file}")
@@ -683,6 +795,29 @@ def conversation_ended():
     Conversation ended page: Show closing message to the user.
     """
     return render_template('conversation_ended.html')
+
+
+@app.route('/planning')
+def planning():
+    """
+    Planning page: Shown to the participant at the end of the study session.
+    """
+    return render_template('planning.html')
+
+
+@app.route('/api/play_notification', methods=['POST'])
+def play_notification():
+    """
+    Play a notification sound on the server machine.
+
+    Called from the client when the participant clicks the planning link,
+    so that nearby researchers hear that the participant has reached this point.
+    """
+    sound_path = Path(__file__).parent / 'static' / 'sounds' / 'notification_sound.wav'
+    if sound_path.exists():
+        # SND_FILENAME: play from file, SND_ASYNC: return immediately
+        winsound.PlaySound(str(sound_path), winsound.SND_FILENAME | winsound.SND_ASYNC)
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/api/cleanup_session', methods=['POST'])
@@ -767,7 +902,7 @@ def delete_flask_session_file() -> None:
 # HANDOVER HELPER FUNCTIONS - Manage switching between chatbots
 # ============================================================================
 # Handover is when the conversation is switched from one chatbot to another.
-# Currently, this is keyword-based. If a keyword is detected and anough turns
+# Currently, this is keyword-based. If a keyword is detected and enough turns
 # have passed, the system will inform the user that they will hand over the 
 # conversation to a different chatbot and prepare for the switch. 
 
@@ -828,7 +963,7 @@ def create_handover_response(session_id, current_bot, target_bot_type, expanded_
         user_query: The original user message (before expansion)
     
     Returns:
-        A JSON response to send to the web page with the handover message
+        A JSON response to send to the web page with the handover messages
     """    
     # Get information about the target bot for the handover message
     target_bot_name = registry.get_bot_name(target_bot_type)
@@ -836,17 +971,17 @@ def create_handover_response(session_id, current_bot, target_bot_type, expanded_
 
     logger.info(f"Handover triggered from {current_bot.name} to {target_bot_name} (keyword: {triggered_keyword})")
     
-    # Create the handover message
-    handover_message = f"""From what you're saying, I believe that it would be best to talk to {target_bot_name}, the {target_bot_role} of Creative Technology. They can help you further. I will summarise our conversation and hand it over.
-
-        Please wait for a bit while I hand over the conversation to {target_bot_name}...
-        """
+    # Create the two handover messages shown before the switch
+    handover_messages = [
+        f"From what you're saying, I believe that it would be best to talk to {target_bot_name}, the {target_bot_role} of Creative Technology. They can help you further. I will summarise our conversation and hand it over.",
+        f"Please wait for a bit while I hand over the conversation to {target_bot_name}..."
+    ]
     
-    # Record the handover message in the conversation log
+    # Record the handover messages in the conversation log as one combined entry
     conversation_logger.log_message(
         session_id=session_id,
         speaker=current_bot.name,
-        ai_response=handover_message,
+        ai_response="\n\n".join(handover_messages),
         user_query=user_query,
         expanded_query=expanded_query,
         timestamp=datetime.now(),
@@ -870,7 +1005,7 @@ def create_handover_response(session_id, current_bot, target_bot_type, expanded_
     # Send response to web page
     return jsonify({
         'handover_occurred': True,
-        'handover_message': handover_message,
+        'handover_messages': handover_messages,
         'bot_name': current_bot.name,
         'bot_display_name': registry.get_bot_display_name(target_bot_type),
         'target_bot_name': target_bot_name,

@@ -49,6 +49,7 @@ let shouldShowLeaveWarning = true;
 let pendingNavigation = null;         
 let hasHandoverOccurred = false;
 let isWaitingForHandoverStart = false;
+let sessionIsEnding = false;           // True once the ending phase has started (prevents double-triggering)
 
 
 /* ============================================================================
@@ -289,10 +290,14 @@ async function sendMessage() {
         typingIndicator.remove();
         
         // Handle handover if it occurred
-        if (data.handover_occurred && data.handover_message) {
+        if (data.handover_occurred) {
             await handleHandover(data, message);
+        } else if (data.session_ending && data.ending_messages && data.ending_messages.length > 0
+                    && !sessionIsEnding) {
+            // The backend intercepted the user's query to start the ending phase
+            await handleSessionEnding(data.ending_messages);
         } else {
-            // No handover - just display response normally
+            // Display bot response as normal
             currentBotName = data.bot_name;
             addMessage('bot', data.bot_name, data.response, data.bot_display_name);
         }
@@ -304,8 +309,9 @@ async function sendMessage() {
     } finally {
         isProcessing = false;
 
-        // Re-enable input unless we're waiting for explicit handover start
-        if (!isWaitingForHandoverStart) {
+        // Re-enable input unless we're waiting for a handover to start,
+        // or the conversation has ended (manually or through the ending phase)
+        if (!isWaitingForHandoverStart && !conversationEnded) {
             userInput.disabled = false;
             sendButton.disabled = false;
             userInput.focus();
@@ -318,11 +324,17 @@ async function sendMessage() {
  * Shows handover message, preloads the new bot response, and completes handover after user confirmation
  */
 async function handleHandover(data, originalMessage) {
-    // Delay displaying handover message to make it feel more natural
-    const handoverTypingIndicator = showTypingIndicator();
-    await new Promise(resolve => setTimeout(resolve, 4000));
-    handoverTypingIndicator.remove();
-    addMessage('bot', currentBotDisplayName, data.handover_message);
+    // Show one or more handover messages with delays between them
+    const handoverMessages = (data.handover_messages && data.handover_messages.length > 0)
+        ? data.handover_messages
+        : [data.handover_message];
+
+    for (const handoverText of handoverMessages) {
+        const handoverTypingIndicator = showTypingIndicator();
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        handoverTypingIndicator.remove();
+        addMessage('bot', currentBotDisplayName, handoverText);
+    }
 
     // Lock chatting with current bot until user explicitly starts the handover
     isWaitingForHandoverStart = true;
@@ -415,6 +427,108 @@ async function handleHandover(data, originalMessage) {
     isWaitingForHandoverStart = false;
     userInput.placeholder = 'Type your message here...';
 }
+
+/**
+ * Handle the end of the study session's conversation phase.
+ * 
+ * Shows the ending messages one by one (with natural delays), then saves
+ * the conversation. The chat input is disabled for the rest of the session
+ * because the conversation phase is complete.
+ * 
+ * @param {Array} endingMessages - Array of message objects from the backend
+ */
+async function handleSessionEnding(endingMessages) {
+    // Guard against this being called twice (e.g., if the response arrives late)
+    sessionIsEnding = true;
+
+    // Disable chat input
+    userInput.disabled = true;
+    sendButton.disabled = true;
+    shouldShowLeaveWarning = false;
+
+    // Show each ending message with a short pause before it, so they feel natural
+    for (const msg of endingMessages) {
+        const typingIndicator = showTypingIndicator();
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        typingIndicator.remove();
+
+        if (msg.type === 'link') {
+            // Final message includes the clickable link to the planning page
+            addMessageWithLink('bot', currentBotName, msg.text, msg.link_url, msg.link_text, currentBotDisplayName);
+        } else {
+            addMessage('bot', currentBotName, msg.text, currentBotDisplayName);
+        }
+    }
+
+    // Save the conversation log now that the session is complete
+    conversationEnded = true;
+    try {
+        await fetch('/api/end_conversation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error saving conversation at end of session:', error);
+    }
+}
+
+/**
+ * Add a message to the chat that contains a clickable link.
+ *
+ * Uses DOM construction rather than innerHTML so that both the text and the
+ * link are handled safely — no raw HTML is injected.
+ * 
+ * @param {string} type        - CSS class for the message wrapper ('bot', 'user', 'system')
+ * @param {string} sender      - Bot or user name used as fallback header text
+ * @param {string} text        - Plain text shown before the link
+ * @param {string} linkUrl     - The URL the link points to
+ * @param {string} linkText    - The visible label of the link
+ * @param {string} displayName - Optional display name shown in the message header
+ */
+function addMessageWithLink(type, sender, text, linkUrl, linkText, displayName) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+
+    const timestamp = new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    const headerName = displayName || sender;
+
+    const header = document.createElement('div');
+    header.className = 'message-header';
+    header.textContent = headerName;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    // textContent safely escapes any special characters in the message text
+    bubble.appendChild(document.createTextNode(text));
+
+    // Append the link as a proper DOM element (not raw HTML)
+    const link = document.createElement('a');
+    link.href = linkUrl;
+    link.textContent = linkText;
+    link.target = '_blank';           // Open in a new tab so the chat page stays visible
+    link.rel = 'noopener noreferrer'; // Security: new tab cannot access window.opener
+    link.addEventListener('click', function () {
+        // Fire-and-forget: tell the server to play the notification sound
+        fetch('/api/play_notification', { method: 'POST' }).catch(function () {});
+    });
+    bubble.appendChild(link);
+
+    const ts = document.createElement('div');
+    ts.className = 'message-timestamp';
+    ts.textContent = timestamp;
+
+    messageDiv.appendChild(header);
+    messageDiv.appendChild(bubble);
+    messageDiv.appendChild(ts);
+
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+}
+
 
 /**
  * Show an in-chat button that lets the user start chatting with the new bot.
@@ -546,6 +660,13 @@ function updateHandoverTheme() {
 async function endConversation() {
     // Close the confirmation modal
     endModal.classList.remove('active');
+
+    // If the session was already ended automatically (for example by the
+    // ending-phase flow), do not call the API again.
+    if (conversationEnded) {
+        window.location.href = '/conversation_ended';
+        return;
+    }
     
     // Disable input to prevent more messages
     userInput.disabled = true;
