@@ -127,6 +127,14 @@ Define condition specifying:
 - Which VA starts the conversation
 - Whether handover (routing) can take place
 
+Researchers can influence which condition is assigned to a participant through
+the participant's login code. Codes beginning with `G` are assigned to the
+`general` condition, while codes beginning with `T` are assigned to the
+`teacher_to_adviser` condition. For codes with another prefix, the application
+randomly selects one of the conditions listed in `STUDY_CONDITIONS`. To change
+the conditions available for random assignment, update `STUDY_CONDITIONS` in
+[config/conditions.py](config/conditions.py).
+
 ### File paths ([paths.py](config/paths.py))
 
 All file paths are defined here. Update when adding new databases and if you modify the directory structure.
@@ -189,18 +197,27 @@ If you want to add a new database type, update the following:
 
 ### File structure
 
-The file structure should be as follows:
+The repository includes the empty data folders and the empty Chroma database
+folders as placeholders. Add the source files and generated database files
+locally; they are excluded from Git because they may contain sensitive data
+and can be regenerated.
+
+File structure:
 
 ```
 data_sources/
-├── create_database.py        ✅ Included
-├── Data/                     ❌ NOT included in repository
-│   └── Context/                        # .md files used to generate Chroma database
-└── Database/                 ❌ NOT included in repository
-    ├── *_chunks.md                     # .md files with all chunks for analysis purposes
-    ├── Chroma_database_*/              # Chroma database(s) used for RAG
-        └── [vector database files]
+├── create_database.py        
+├── Data/                     (empty placeholder)
+│   └── Context/              
+└── Database/                 (empty placeholder)
+    ├── Chroma_database_all/             
+    ├── Chroma_database_study_adviser/   
+    └── Chroma_database_teacher/         
 ```
+
+The Chroma database folders contain only a placeholder file in the repository.
+The generated vector database files and `*_chunks.md` analysis files remain
+local and are ignored by Git.
 
 ## Troubleshooting
 - If you get the error `ModuleNotFoundError: No module named 'config'`, check whether you are using the correct file to run the application. Make sure to use the run_* file.

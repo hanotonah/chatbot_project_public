@@ -13,7 +13,7 @@ storage/flask_session/*
 !storage/flask_session/.gitkeep
 storage/participants/participant_registry.json
 
-# Data sources - NOT included in repository due to sensitity of data
+# Data sources - user data and generated databases are not included
 # Knowledge base markdown files and vector databases must be provided separately
 # See README.md section "Required Data Files" for setup instructions
 data_sources/Data/Context/*
@@ -21,7 +21,9 @@ data_sources/Data/Context/*
 data_sources/Data/Unused_context/*
 !data_sources/Data/Unused_context/.gitkeep
 data_sources/Database/*
-!data_sources/Database/.gitkeep
+!data_sources/Database/*/
+data_sources/Database/*/*
+!data_sources/Database/*/.gitkeep
 
 # Keep the database creation script and folders
 !data_sources/create_database.py
