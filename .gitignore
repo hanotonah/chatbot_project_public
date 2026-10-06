@@ -20,8 +20,8 @@ data_sources/Data/Context/*
 !data_sources/Data/Context/.gitkeep
 data_sources/Data/Unused_context/*
 !data_sources/Data/Unused_context/.gitkeep
-data_sources/Database/*
-!data_sources/Database/.gitkeep
+
+
 
 # Keep the database creation script and folders
 !data_sources/create_database.py
