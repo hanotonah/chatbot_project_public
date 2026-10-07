@@ -6,7 +6,7 @@ A multi-assistant platform designed to support university students through conve
 
 **Author:** Hannah Ottenschot, HMI, University of Twente  
 
-**Last updated:** March 2026 
+**Last updated:** October 2026 
 
 ---
 
